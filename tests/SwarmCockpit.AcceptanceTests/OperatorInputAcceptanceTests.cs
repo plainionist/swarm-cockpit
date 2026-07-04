@@ -5,11 +5,11 @@ using SwarmCockpit.Contracts;
 
 namespace SwarmCockpit.AcceptanceTests;
 
-public sealed class OperatorInputAcceptanceTests : IClassFixture<RemoteQuestionFlowAcceptanceTests.CockpitFactory>
+public sealed class OperatorInputAcceptanceTests : IClassFixture<CockpitFactory>
 {
     private readonly HttpClient _client;
 
-    public OperatorInputAcceptanceTests(RemoteQuestionFlowAcceptanceTests.CockpitFactory factory)
+    public OperatorInputAcceptanceTests(CockpitFactory factory)
     {
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {

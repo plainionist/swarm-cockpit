@@ -38,20 +38,6 @@ you can answer the questions you see on the mirrored screen from any device on t
 network, no agent cooperation required. Input is queued in the cockpit and delivered
 by the same poller that mirrors the screen (within ~1s).
 
-Ask a blocking question from an agent shell:
-
-```bash
-bash ./swarm-cockpit ask \
-  --agent Implementer \
-  --context "Need decision" \
-  --question "Use option A or B?" \
-  --option "A" \
-  --option "B" \
-  --recommendation "A"
-```
-
-Answer in the web page. The waiting command continues.
-
 Disable screen mirroring:
 
 ```bash

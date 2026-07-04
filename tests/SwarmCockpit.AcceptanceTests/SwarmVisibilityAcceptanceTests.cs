@@ -4,11 +4,11 @@ using SwarmCockpit.Contracts;
 
 namespace SwarmCockpit.AcceptanceTests;
 
-public sealed class SwarmVisibilityAcceptanceTests : IClassFixture<RemoteQuestionFlowAcceptanceTests.CockpitFactory>
+public sealed class SwarmVisibilityAcceptanceTests : IClassFixture<CockpitFactory>
 {
     private readonly HttpClient _client;
 
-    public SwarmVisibilityAcceptanceTests(RemoteQuestionFlowAcceptanceTests.CockpitFactory factory)
+    public SwarmVisibilityAcceptanceTests(CockpitFactory factory)
     {
         _client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -16,8 +16,8 @@ public sealed class SwarmVisibilityAcceptanceTests : IClassFixture<RemoteQuestio
         });
     }
 
-    [Fact(DisplayName = "Scenario: three-agent board shows running and blocked states from logs and questions")]
-    public async Task ThreeAgentBoardShowsRunningAndBlockedStates()
+    [Fact(DisplayName = "Scenario: three-agent board shows running state from ingested logs")]
+    public async Task ThreeAgentBoardShowsRunningStateFromLogs()
     {
         var ingest = await _client.PostAsJsonAsync(
             "/api/agents/Implementer/logs",
@@ -38,24 +38,5 @@ public sealed class SwarmVisibilityAcceptanceTests : IClassFixture<RemoteQuestio
         var dashboardHtml = await _client.GetStringAsync("/");
         Assert.Contains("Swarm", dashboardHtml);
         Assert.Contains("Compiling feature slice", dashboardHtml);
-
-        var createQuestion = await _client.PostAsJsonAsync(
-            "/api/questions",
-            new CreateQuestionRequest(
-                AskingAgent: "Implementer",
-                Context: "Need product choice",
-                Question: "Proceed with A or B?",
-                Options: ["A", "B"],
-                Recommendation: "A"));
-        createQuestion.EnsureSuccessStatusCode();
-
-        var blockedStatusResponse = await _client.GetAsync("/api/agents/status");
-        blockedStatusResponse.EnsureSuccessStatusCode();
-        var blockedOverview = await blockedStatusResponse.Content.ReadFromJsonAsync<SwarmOverviewViewModel>();
-
-        Assert.NotNull(blockedOverview);
-        var blockedImplementer = blockedOverview!.Agents.Single(a => a.AgentName == "Implementer");
-        Assert.Equal("blocked", blockedImplementer.Status);
-        Assert.True(blockedImplementer.NeedsHumanInput);
     }
 }

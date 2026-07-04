@@ -7,14 +7,10 @@ namespace SwarmCockpit.Service;
 internal static class HtmlRenderer
 {
     public static string RenderDashboard(
-        IReadOnlyList<QuestionViewModel> questions,
         IReadOnlyList<AgentStatusViewModel> statuses,
         IReadOnlyDictionary<string, IReadOnlyList<AgentLogLineViewModel>> logsByAgent,
         IReadOnlyDictionary<string, AgentScreenViewModel> screensByAgent)
     {
-        var openQuestions = questions.Where(q => q.Status.Equals("open", StringComparison.OrdinalIgnoreCase)).ToList();
-        var answeredQuestions = questions.Where(q => q.Status.Equals("answered", StringComparison.OrdinalIgnoreCase)).Take(20).ToList();
-
         var html = new StringBuilder();
         html.AppendLine("<!doctype html>");
         html.AppendLine("<html lang=\"en\">");
@@ -34,7 +30,6 @@ internal static class HtmlRenderer
         html.AppendLine("    .tab.active { border-color:#0f7b6c; box-shadow:0 0 0 2px rgba(15,123,108,.15) inset; font-weight:700; }");
         html.AppendLine("    .tab-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#9ca8b3; vertical-align:middle; }");
         html.AppendLine("    .tab-dot.running { background:#0f7b6c; }");
-        html.AppendLine("    .tab-dot.blocked { background:#bf3b2a; }");
         html.AppendLine("    .tab-panel { display:none; margin-top:12px; }");
         html.AppendLine("    .tab-panel.active { display:block; }");
         html.AppendLine("    .tab-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }");
@@ -108,62 +103,6 @@ internal static class HtmlRenderer
         html.AppendLine("    </div>");
         html.AppendLine("  </section>");
 
-        html.AppendLine("  <section class=\"section\">");
-        html.AppendLine($"    <h2>Open ({openQuestions.Count})</h2>");
-        if (openQuestions.Count == 0)
-        {
-            html.AppendLine("    <p class=\"meta\">No open questions.</p>");
-        }
-        else
-        {
-            foreach (var question in openQuestions)
-            {
-                html.AppendLine("    <article class=\"item\">");
-                html.AppendLine($"      <div><strong>{Html(question.AskingAgent)}</strong> <span class=\"meta\">asked at {question.CreatedAt:O}</span></div>");
-                html.AppendLine($"      <div><strong>Context:</strong> {Html(question.Context)}</div>");
-                html.AppendLine($"      <div><strong>Question:</strong> {Html(question.Question)}</div>");
-                html.AppendLine($"      <div><strong>Recommendation:</strong> {Html(question.Recommendation)}</div>");
-                if (question.Options.Count > 0)
-                {
-                    html.AppendLine("      <div><strong>Options:</strong></div>");
-                    html.AppendLine("      <ul>");
-                    foreach (var option in question.Options)
-                    {
-                        html.AppendLine($"        <li>{Html(option)}</li>");
-                    }
-                    html.AppendLine("      </ul>");
-                }
-
-                html.AppendLine($"      <form method=\"post\" action=\"/questions/{Html(question.Id)}/answer\">");
-                html.AppendLine("        <label for=\"answer\">Answer</label>");
-                html.AppendLine("        <textarea id=\"answer\" name=\"answer\" required></textarea>");
-                html.AppendLine("        <div style=\"margin-top:8px\"><button type=\"submit\">Submit answer</button></div>");
-                html.AppendLine("      </form>");
-                html.AppendLine("    </article>");
-            }
-        }
-
-        html.AppendLine("  </section>");
-
-        html.AppendLine("  <section class=\"section\">");
-        html.AppendLine($"    <h2>Recently Answered ({answeredQuestions.Count})</h2>");
-        if (answeredQuestions.Count == 0)
-        {
-            html.AppendLine("    <p class=\"meta\">No answered questions yet.</p>");
-        }
-        else
-        {
-            foreach (var question in answeredQuestions)
-            {
-                html.AppendLine("    <article class=\"item\">");
-                html.AppendLine($"      <div><strong>{Html(question.AskingAgent)}</strong> <span class=\"meta\">answered at {question.AnsweredAt:O}</span></div>");
-                html.AppendLine($"      <div><strong>Question:</strong> {Html(question.Question)}</div>");
-                html.AppendLine($"      <div><strong>Answer:</strong> {Html(question.Answer ?? string.Empty)}</div>");
-                html.AppendLine("    </article>");
-            }
-        }
-
-        html.AppendLine("  </section>");
         html.AppendLine("  <script>");
         html.AppendLine("    (function () {");
         html.AppendLine("      const tabs = Array.from(document.querySelectorAll('.tab')); ");
@@ -211,8 +150,6 @@ internal static class HtmlRenderer
         html.AppendLine("          if (dot) { dot.className = 'tab-dot ' + (state.status || 'idle'); }");
         html.AppendLine("          const panel = byAgent(panels, state.agentName);");
         html.AppendLine("          if (!panel) return;");
-        html.AppendLine("          const stateText = panel.querySelector(\"[data-role='state']\");");
-        html.AppendLine("          if (stateText) { stateText.textContent = state.needsHumanInput ? 'Needs input' : ''; }");
         html.AppendLine("        });");
         html.AppendLine("      }");
         html.AppendLine("      async function refreshActiveLog() {");

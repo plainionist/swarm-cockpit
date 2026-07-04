@@ -5,18 +5,10 @@ namespace SwarmCockpit.Service;
 internal static class AgentStatusBuilder
 {
     public static async Task<IReadOnlyList<AgentStatusViewModel>> BuildAsync(
-        QuestionRepository questionRepository,
         AgentRuntimeRepository runtimeRepository,
         IConfiguration configuration,
         CancellationToken cancellationToken)
     {
-        var questions = await questionRepository.GetQuestionsAsync(cancellationToken);
-        var openQuestionAgents = questions
-            .Where(q => q.Status.Equals("open", StringComparison.OrdinalIgnoreCase))
-            .Select(q => q.AskingAgent)
-            .Where(agent => !string.IsNullOrWhiteSpace(agent))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         var configuredAgents = configuration
             .GetSection("Swarm:Agents")
             .Get<string[]>()
@@ -37,7 +29,6 @@ internal static class AgentStatusBuilder
 
         var agentNames = configuredAgents
             .Concat(snapshotByAgent.Keys)
-            .Concat(openQuestionAgents)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -50,14 +41,9 @@ internal static class AgentStatusBuilder
         foreach (var agentName in agentNames)
         {
             snapshotByAgent.TryGetValue(agentName, out var snapshot);
-            var needsHumanInput = openQuestionAgents.Contains(agentName);
 
             var status = "idle";
-            if (needsHumanInput)
-            {
-                status = "blocked";
-            }
-            else if (snapshot is not null && now - snapshot.LastActivity <= TimeSpan.FromSeconds(runningThresholdSeconds))
+            if (snapshot is not null && now - snapshot.LastActivity <= TimeSpan.FromSeconds(runningThresholdSeconds))
             {
                 status = "running";
             }
@@ -66,8 +52,7 @@ internal static class AgentStatusBuilder
                 agentName,
                 status,
                 snapshot?.LastActivity,
-                snapshot?.LastMessage,
-                needsHumanInput));
+                snapshot?.LastMessage));
         }
 
         return statuses

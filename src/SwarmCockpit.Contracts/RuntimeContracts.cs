@@ -29,7 +29,6 @@ public sealed record AgentStatusViewModel(
     string AgentName,
     string Status,
     DateTimeOffset? LastActivity,
-    string? LastMessage,
-    bool NeedsHumanInput);
+    string? LastMessage);
 
 public sealed record SwarmOverviewViewModel(IReadOnlyList<AgentStatusViewModel> Agents);

@@ -9,7 +9,6 @@ Usage:
   swarm-cockpit start [-- <extra dotnet args>]
   swarm-cockpit enable-logs [--base-url <url>] [--config <path>] [--socket-file <path>]
   swarm-cockpit disable-logs [--config <path>] [--socket-file <path>]
-  swarm-cockpit ask --agent <name> --context <text> --question <text> --recommendation <text> [--option <text> ...] [--base-url <url>] [--poll-interval-ms <ms>]
 EOF
 }
 
@@ -30,9 +29,6 @@ case "${verb}" in
     ;;
   disable-logs)
     bash "${SCRIPT_DIR}/scripts/swarmforge-disable-log-stream.sh" "$@"
-    ;;
-  ask)
-    bash "${SCRIPT_DIR}/scripts/swarm-ask.sh" "$@"
     ;;
   -h|--help|help)
     usage
