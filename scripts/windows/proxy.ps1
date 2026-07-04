@@ -2,9 +2,12 @@
 # Run as Administrator
 
 param(
+    [Parameter(Position = 0)]
     [ValidateSet("start", "stop")]
     [string]$Verb = "start",
 
+    [Alias("Host")]
+    [Parameter(Position = 1)]
     [string]$CockpitHost,
 
     [int]$CockpitPort = 5959,
@@ -18,18 +21,60 @@ if ($Verb -eq "stop") {
 }
 
 if ([string]::IsNullOrWhiteSpace($CockpitHost)) {
-    throw "CockpitHost is required when Verb is 'start'."
+    throw "CockpitHost is required when Verb is 'start'. Use -CockpitHost or -Host."
 }
 
-$listenIp = (
-    Get-NetIPAddress -AddressFamily IPv4 |
-    Where-Object {
-        $_.IPAddress -notlike "127.*" -and
-        $_.PrefixOrigin -ne "WellKnown" -and
-        $_.InterfaceAlias -notlike "*Loopback*"
-    } |
-    Select-Object -First 1 -ExpandProperty IPAddress
-)
+$ipHelper = Get-Service -Name iphlpsvc -ErrorAction SilentlyContinue
+if (-not $ipHelper) {
+    throw "Required service 'iphlpsvc' (IP Helper) was not found."
+}
+
+if ($ipHelper.Status -ne "Running") {
+    try {
+        if ($ipHelper.StartType -eq "Disabled") {
+            Set-Service -Name iphlpsvc -StartupType Manual -ErrorAction Stop
+        }
+
+        Start-Service -Name iphlpsvc -ErrorAction Stop
+    }
+    catch {
+        throw "IP Helper service (iphlpsvc) must be running for portproxy. Re-run this script as Administrator, then try again."
+    }
+}
+
+$defaultRoute = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix "0.0.0.0/0" |
+    Sort-Object RouteMetric, InterfaceMetric |
+    Select-Object -First 1
+
+$listenIp = $null
+
+if ($defaultRoute) {
+    $listenIp = (
+        Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $defaultRoute.InterfaceIndex |
+        Where-Object {
+            $_.IPAddress -notlike "127.*" -and
+            $_.PrefixOrigin -ne "WellKnown" -and
+            $_.InterfaceAlias -notlike "*Loopback*"
+        } |
+        Select-Object -First 1 -ExpandProperty IPAddress
+    )
+}
+
+if (-not $listenIp) {
+    $listenIp = (
+        Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object {
+            $_.IPAddress -notlike "127.*" -and
+            $_.PrefixOrigin -ne "WellKnown" -and
+            $_.InterfaceAlias -notlike "*Loopback*"
+        } |
+        Select-Object -First 1 -ExpandProperty IPAddress
+    )
+}
+
+if (-not $listenIp) {
+    throw "Could not determine a non-loopback IPv4 address to listen on."
+}
 
 Write-Host "Laptop listen IP: $listenIp"
 Write-Host "Forwarding http://$listenIp`:$ListenPort -> $CockpitHost`:$CockpitPort"
