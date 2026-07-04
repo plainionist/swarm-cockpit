@@ -22,12 +22,18 @@ app.MapGet("/", async (QuestionRepository repository, AgentRuntimeRepository run
 	var questions = await repository.GetQuestionsAsync(cancellationToken);
 	var statuses = await AgentStatusBuilder.BuildAsync(repository, runtimeRepository, configuration, cancellationToken);
 	var logsByAgent = new Dictionary<string, IReadOnlyList<AgentLogLineViewModel>>(StringComparer.OrdinalIgnoreCase);
+	var screensByAgent = new Dictionary<string, AgentScreenViewModel>(StringComparer.OrdinalIgnoreCase);
 	foreach (var agent in statuses.Select(a => a.AgentName))
 	{
 		logsByAgent[agent] = await runtimeRepository.GetRecentLogsAsync(agent, 300, cancellationToken);
+		var screen = await runtimeRepository.GetScreenAsync(agent, cancellationToken);
+		if (screen is not null)
+		{
+			screensByAgent[agent] = screen;
+		}
 	}
 
-	var html = HtmlRenderer.RenderDashboard(questions, statuses, logsByAgent);
+	var html = HtmlRenderer.RenderDashboard(questions, statuses, logsByAgent, screensByAgent);
 	return Results.Content(html, "text/html");
 });
 
@@ -52,6 +58,36 @@ app.MapGet("/api/agents/{agentName}/logs", async (string agentName, int? take, A
 {
 	var lines = await repository.GetRecentLogsAsync(agentName, take ?? 200, cancellationToken);
 	return Results.Ok(lines);
+});
+
+app.MapPut("/api/agents/{agentName}/screen", async Task<Results<Ok<AgentScreenViewModel>, BadRequest<string>>>
+	(string agentName, HttpRequest request, AgentRuntimeRepository repository, CancellationToken cancellationToken) =>
+{
+	if (string.IsNullOrWhiteSpace(agentName))
+	{
+		return TypedResults.BadRequest("agentName is required.");
+	}
+
+	string content;
+	using (var reader = new StreamReader(request.Body))
+	{
+		content = await reader.ReadToEndAsync(cancellationToken);
+	}
+
+	var screen = await repository.UpsertScreenAsync(agentName, content, cancellationToken);
+	return TypedResults.Ok(screen);
+});
+
+app.MapGet("/api/agents/{agentName}/screen", async Task<Results<Ok<AgentScreenViewModel>, NotFound>>
+	(string agentName, AgentRuntimeRepository repository, CancellationToken cancellationToken) =>
+{
+	var screen = await repository.GetScreenAsync(agentName, cancellationToken);
+	if (screen is null)
+	{
+		return TypedResults.NotFound();
+	}
+
+	return TypedResults.Ok(screen);
 });
 
 app.MapDelete("/api/agents/{agentName}/logs", async (string agentName, AgentRuntimeRepository repository, CancellationToken cancellationToken) =>

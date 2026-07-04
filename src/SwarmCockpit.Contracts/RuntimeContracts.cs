@@ -9,6 +9,13 @@ public sealed record AgentLogLineViewModel(
     string Stream,
     DateTimeOffset CreatedAt);
 
+public sealed record IngestAgentScreenRequest(string Content);
+
+public sealed record AgentScreenViewModel(
+    string AgentName,
+    string Content,
+    DateTimeOffset CapturedAt);
+
 public sealed record AgentStatusViewModel(
     string AgentName,
     string Status,

@@ -122,7 +122,7 @@ if ! tmux -S "${socket}" list-panes -a >/dev/null 2>&1; then
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ingest_script="${script_dir}/swarm-ingest-lines.sh"
+capture_script="${script_dir}/swarm-capture-screens.sh"
 
 normalize() {
   echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/ /g'
@@ -226,29 +226,54 @@ fi
 
 log "agents from config: ${agents[*]}"
 
+state_dir="$(cd "$(dirname "${socket_file}")" && pwd)"
+pid_file="${state_dir}/cockpit-capture.pid"
+capture_log="${state_dir}/cockpit-capture.log"
+
+# Stop any previously running capture poller (e.g. from an earlier port).
+if [[ -f "${pid_file}" ]]; then
+  old_pid="$(<"${pid_file}")"
+  if [[ -n "${old_pid}" ]] && kill -0 "${old_pid}" 2>/dev/null; then
+    kill "${old_pid}" 2>/dev/null || true
+  fi
+  rm -f "${pid_file}"
+fi
+
+declare -a pane_args=()
 skipped=0
 
 for agent in "${agents[@]}"; do
-  command="bash '${ingest_script}' --agent '${agent}' --base-url '${base_url}'"
-
   if target="$(find_pane_target_for_agent "${agent}")"; then
-    log "pipe-pane target for ${agent}: ${target}"
-    # Always reset first so a previous pipe target (e.g., old port) is replaced.
-    tmux -S "${socket}" pipe-pane -t "${target}"
-    tmux -S "${socket}" pipe-pane -O -t "${target}" "${command}"
-    echo "Enabled log stream for ${agent} on ${target}"
+    log "capture target for ${agent}: ${target}"
+    # Drop any stale pipe-pane stream from a previous cockpit version.
+    tmux -S "${socket}" pipe-pane -t "${target}" 2>/dev/null || true
+    pane_args+=(--pane "${agent}=${target}")
+    echo "Enabled screen mirror for ${agent} on ${target}"
 
-    marker_message="swarm-cockpit stream attached on ${target}"
-    marker_payload="{\"message\":\"${marker_message}\",\"stream\":\"system\"}"
-    if curl -fsS -X POST "${base_url}/api/agents/${agent}/logs" -H "Content-Type: application/json" -d "${marker_payload}" >/dev/null 2>&1; then
-      log "sent marker log for ${agent}"
-    else
-      echo "[swarm-cockpit] warning: could not send marker log for ${agent}" >&2
-    fi
+    marker="swarm-cockpit screen mirror attaching on ${target}"
+    printf '%s' "${marker}" | curl -fsS -X PUT "${base_url}/api/agents/${agent}/screen" \
+      -H "Content-Type: text/plain; charset=utf-8" \
+      --data-binary @- >/dev/null 2>&1 || true
   else
     echo "Skipped ${agent}: no matching tmux pane found"
     skipped=$((skipped + 1))
   fi
 done
 
-echo "Done. Open ${base_url} to view live status and logs."
+if [[ ${#pane_args[@]} -eq 0 ]]; then
+  echo "No agent panes matched; nothing to mirror." >&2
+  exit 1
+fi
+
+nohup bash "${capture_script}" \
+  --socket "${socket}" \
+  --base-url "${base_url}" \
+  --interval 1 \
+  "${pane_args[@]}" >"${capture_log}" 2>&1 &
+
+capture_pid=$!
+echo "${capture_pid}" > "${pid_file}"
+disown 2>/dev/null || true
+
+log "started capture poller pid=${capture_pid} (log: ${capture_log})"
+echo "Done. Open ${base_url} to view live agent screens."

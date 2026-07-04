@@ -47,6 +47,18 @@ if ! tmux -S "${socket}" list-panes -a >/dev/null 2>&1; then
   exit 1
 fi
 
+state_dir="$(cd "$(dirname "${socket_file}")" && pwd)"
+pid_file="${state_dir}/cockpit-capture.pid"
+
+if [[ -f "${pid_file}" ]]; then
+  capture_pid="$(<"${pid_file}")"
+  if [[ -n "${capture_pid}" ]] && kill -0 "${capture_pid}" 2>/dev/null; then
+    kill "${capture_pid}" 2>/dev/null || true
+    echo "Stopped screen mirror poller (pid ${capture_pid})"
+  fi
+  rm -f "${pid_file}"
+fi
+
 find_pane_target_for_agent() {
   local agent_name="$1"
   local candidate=""
@@ -80,7 +92,7 @@ mapfile -t agents < <(
 
 for agent in "${agents[@]}"; do
   if target="$(find_pane_target_for_agent "${agent}")"; then
-    tmux -S "${socket}" pipe-pane -t "${target}"
-    echo "Disabled log stream for ${agent} on ${target}"
+    tmux -S "${socket}" pipe-pane -t "${target}" 2>/dev/null || true
+    echo "Disabled screen mirror for ${agent} on ${target}"
   fi
 done

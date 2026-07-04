@@ -9,7 +9,8 @@ internal static class HtmlRenderer
     public static string RenderDashboard(
         IReadOnlyList<QuestionViewModel> questions,
         IReadOnlyList<AgentStatusViewModel> statuses,
-        IReadOnlyDictionary<string, IReadOnlyList<AgentLogLineViewModel>> logsByAgent)
+        IReadOnlyDictionary<string, IReadOnlyList<AgentLogLineViewModel>> logsByAgent,
+        IReadOnlyDictionary<string, AgentScreenViewModel> screensByAgent)
     {
         var openQuestions = questions.Where(q => q.Status.Equals("open", StringComparison.OrdinalIgnoreCase)).ToList();
         var answeredQuestions = questions.Where(q => q.Status.Equals("answered", StringComparison.OrdinalIgnoreCase)).Take(20).ToList();
@@ -42,7 +43,7 @@ internal static class HtmlRenderer
         html.AppendLine("    .tab-state { color:var(--muted); font-size:.9rem; }");
         html.AppendLine("    .meta { color:var(--muted); font-size:.9rem; }");
         html.AppendLine("    ul { margin:8px 0 8px 22px; }");
-        html.AppendLine("    pre.log-full { white-space:pre-wrap; background:#f8fbfd; border:1px solid var(--line); border-radius:8px; padding:10px; min-height:58vh; max-height:58vh; overflow:auto; margin:0; }");
+        html.AppendLine("    pre.log-full { white-space:pre; overflow:auto; background:#0b1220; color:#e6edf3; border:1px solid #1f2a3a; border-radius:8px; padding:12px; min-height:58vh; max-height:58vh; margin:0; font-family:'Cascadia Mono','Consolas','SFMono-Regular',ui-monospace,Menlo,monospace; font-size:12.5px; line-height:1.35; tab-size:4; }");
         html.AppendLine("    textarea { width:100%; min-height:70px; border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }");
         html.AppendLine("    button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 12px; cursor:pointer; }");
         html.AppendLine("    .btn-clear { background:#fff; color:var(--ink); border:1px solid var(--line); }");
@@ -70,9 +71,19 @@ internal static class HtmlRenderer
         {
             var status = statuses[i];
             logsByAgent.TryGetValue(status.AgentName, out var agentLogs);
-            var logText = (agentLogs is null || agentLogs.Count == 0)
-                ? "No logs yet."
-                : string.Join("\n", agentLogs.Select(log => $"[{log.CreatedAt:HH:mm:ss}] {log.Message}"));
+            string logText;
+            if (screensByAgent.TryGetValue(status.AgentName, out var screen) && !string.IsNullOrWhiteSpace(screen.Content))
+            {
+                logText = screen.Content;
+            }
+            else if (agentLogs is not null && agentLogs.Count > 0)
+            {
+                logText = string.Join("\n", agentLogs.Select(log => $"[{log.CreatedAt:HH:mm:ss}] {log.Message}"));
+            }
+            else
+            {
+                logText = "No output yet.";
+            }
 
             var panelActive = i == 0 ? " active" : string.Empty;
             html.AppendLine($"      <article class=\"tab-panel{panelActive}\" data-agent=\"{Html(status.AgentName)}\">");
@@ -180,11 +191,22 @@ internal static class HtmlRenderer
         html.AppendLine("        const logNode = panel.querySelector(\"[data-role='log']\");");
         html.AppendLine("        if (!logNode) return;");
         html.AppendLine("        const nearBottom = (logNode.scrollHeight - logNode.scrollTop - logNode.clientHeight) < 24;");
-        html.AppendLine("        const response = await fetch('/api/agents/' + encodeURIComponent(activeAgent) + '/logs?take=600', { cache: 'no-store' });");
-        html.AppendLine("        if (!response.ok) return;");
+        html.AppendLine("        const agent = activeAgent;");
+        html.AppendLine("        const screenRes = await fetch('/api/agents/' + encodeURIComponent(agent) + '/screen', { cache: 'no-store' });");
+        html.AppendLine("        if (agent !== activeAgent) return;");
+        html.AppendLine("        if (screenRes.ok) {");
+        html.AppendLine("          const screen = await screenRes.json();");
+        html.AppendLine("          if (screen && typeof screen.content === 'string' && screen.content.trim().length) {");
+        html.AppendLine("            if (logNode.textContent !== screen.content) { logNode.textContent = screen.content; }");
+        html.AppendLine("            if (nearBottom) { logNode.scrollTop = logNode.scrollHeight; }");
+        html.AppendLine("            return;");
+        html.AppendLine("          }");
+        html.AppendLine("        }");
+        html.AppendLine("        const response = await fetch('/api/agents/' + encodeURIComponent(agent) + '/logs?take=600', { cache: 'no-store' });");
+        html.AppendLine("        if (agent !== activeAgent || !response.ok) return;");
         html.AppendLine("        const lines = await response.json();");
         html.AppendLine("        const text = (lines || []).map(line => '[' + new Date(line.createdAt).toLocaleTimeString('en-GB', { hour12: false }) + '] ' + line.message).join('\\n');");
-        html.AppendLine("        logNode.textContent = text || 'No logs yet.';");
+        html.AppendLine("        logNode.textContent = text || 'No output yet.';");
         html.AppendLine("        if (nearBottom) { logNode.scrollTop = logNode.scrollHeight; }");
         html.AppendLine("      }");
         html.AppendLine("      async function clearActiveLog() {");

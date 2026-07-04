@@ -137,6 +137,78 @@ public sealed class AgentRuntimeRepository
         }
     }
 
+    public async Task<AgentScreenViewModel> UpsertScreenAsync(
+        string agentName,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var capturedAt = DateTimeOffset.UtcNow;
+            var trimmedName = agentName.Trim();
+
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                INSERT INTO agent_screens (agent_name, content, captured_at)
+                VALUES ($agentName, $content, $capturedAt)
+                ON CONFLICT(agent_name) DO UPDATE SET
+                    content = excluded.content,
+                    captured_at = excluded.captured_at;
+                """;
+            command.Parameters.AddWithValue("$agentName", trimmedName);
+            command.Parameters.AddWithValue("$content", content);
+            command.Parameters.AddWithValue("$capturedAt", capturedAt.ToString("O"));
+
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+            return new AgentScreenViewModel(trimmedName, content, capturedAt);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<AgentScreenViewModel?> GetScreenAsync(string agentName, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT agent_name, content, captured_at
+                FROM agent_screens
+                WHERE agent_name = $agentName COLLATE NOCASE
+                LIMIT 1;
+                """;
+            command.Parameters.AddWithValue("$agentName", agentName);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            return new AgentScreenViewModel(
+                reader.GetString(0),
+                reader.GetString(1),
+                DateTimeOffset.Parse(reader.GetString(2)));
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<AgentActivitySnapshot>> GetLatestAgentActivityAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -148,27 +220,39 @@ public sealed class AgentRuntimeRepository
             var command = connection.CreateCommand();
             command.CommandText =
                 """
-                SELECT l.agent_name, l.message, l.created_at
-                FROM agent_logs l
-                INNER JOIN (
-                    SELECT agent_name, MAX(id) AS max_id
-                    FROM agent_logs
-                    GROUP BY agent_name
-                ) m ON l.id = m.max_id
-                ORDER BY l.agent_name;
+                SELECT agent_name, message, created_at
+                FROM (
+                    SELECT l.agent_name AS agent_name, l.message AS message, l.created_at AS created_at
+                    FROM agent_logs l
+                    INNER JOIN (
+                        SELECT agent_name, MAX(id) AS max_id
+                        FROM agent_logs
+                        GROUP BY agent_name
+                    ) m ON l.id = m.max_id
+                    UNION ALL
+                    SELECT agent_name AS agent_name, '' AS message, captured_at AS created_at
+                    FROM agent_screens
+                )
+                ORDER BY agent_name;
                 """;
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var rows = new List<AgentActivitySnapshot>();
+            var latestByAgent = new Dictionary<string, AgentActivitySnapshot>(StringComparer.OrdinalIgnoreCase);
             while (await reader.ReadAsync(cancellationToken))
             {
-                rows.Add(new AgentActivitySnapshot(
+                var snapshot = new AgentActivitySnapshot(
                     reader.GetString(0),
                     reader.GetString(1),
-                    DateTimeOffset.Parse(reader.GetString(2))));
+                    DateTimeOffset.Parse(reader.GetString(2)));
+
+                if (!latestByAgent.TryGetValue(snapshot.AgentName, out var existing)
+                    || snapshot.LastActivity > existing.LastActivity)
+                {
+                    latestByAgent[snapshot.AgentName] = snapshot;
+                }
             }
 
-            return rows;
+            return latestByAgent.Values.OrderBy(s => s.AgentName, StringComparer.OrdinalIgnoreCase).ToList();
         }
         finally
         {
@@ -229,6 +313,12 @@ public sealed class AgentRuntimeRepository
 
             CREATE INDEX IF NOT EXISTS idx_agent_logs_agent_id
             ON agent_logs(agent_name, id);
+
+            CREATE TABLE IF NOT EXISTS agent_screens (
+                agent_name TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                captured_at TEXT NOT NULL
+            );
             """;
         command.ExecuteNonQuery();
     }

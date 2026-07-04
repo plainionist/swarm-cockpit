@@ -21,11 +21,14 @@ In another shell, start SwarmForge normally:
 ./swarm
 ```
 
-Enable agent log streaming from tmux to cockpit:
+Mirror each agent's live terminal screen from tmux into the cockpit:
 
 ```bash
 bash ./swarm-cockpit enable-logs
 ```
+
+This polls `tmux capture-pane` and shows the agent's actual rendered screen in the
+web page (what you'd see in the terminal), instead of raw redraw bytes.
 
 Ask a blocking question from an agent shell:
 
@@ -41,7 +44,7 @@ bash ./swarm-cockpit ask \
 
 Answer in the web page. The waiting command continues.
 
-Disable log streaming:
+Disable screen mirroring:
 
 ```bash
 bash ./swarm-cockpit disable-logs
