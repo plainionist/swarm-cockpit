@@ -4,3 +4,6 @@ obj/
 *.user
 *.suo
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
