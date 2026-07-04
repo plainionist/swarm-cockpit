@@ -63,10 +63,14 @@ if ! tmux -S "${socket}" capture-pane -p -J -t "${first_target}" >/dev/null 2>&1
 fi
 log "using capture flags: ${capture_flags[*]}"
 
-# Build agent -> target lookup for input delivery.
+# Build agent -> target lookup for input delivery. Keys are lowercased so the
+# lookup is case-insensitive (the web UI may send "Architect" while panes are
+# registered as "architect").
 declare -A target_by_agent=()
 for entry in "${panes[@]}"; do
-  target_by_agent["${entry%%=*}"]="${entry#*=}"
+  entry_agent="${entry%%=*}"
+  entry_agent_lc="$(printf '%s' "${entry_agent}" | tr '[:upper:]' '[:lower:]')"
+  target_by_agent["${entry_agent_lc}"]="${entry#*=}"
 done
 
 # Deliver any operator input queued in the cockpit to the matching tmux pane.
@@ -78,15 +82,17 @@ drain_inputs() {
   fi
   [[ -z "${pending}" ]] && return
 
-  local in_id in_submit in_agent_b64 in_text_b64 in_agent in_text in_target
+  local in_id in_submit in_agent_b64 in_text_b64 in_agent in_agent_lc in_text in_target
   while read -r in_id in_submit in_agent_b64 in_text_b64; do
     [[ -z "${in_id}" ]] && continue
     in_agent="$(printf '%s' "${in_agent_b64}" | base64 -d 2>/dev/null)"
     in_text="$(printf '%s' "${in_text_b64}" | base64 -d 2>/dev/null)"
-    in_target="${target_by_agent[${in_agent}]:-}"
+    in_agent_lc="$(printf '%s' "${in_agent}" | tr '[:upper:]' '[:lower:]')"
+    in_target="${target_by_agent[${in_agent_lc}]:-}"
 
     if [[ -z "${in_target}" ]]; then
       # Not one of our panes; leave it for another poller instance.
+      log "input #${in_id}: no pane target for agent '${in_agent}' (known: ${!target_by_agent[*]})"
       continue
     fi
 
