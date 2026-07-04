@@ -6,10 +6,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${REPO_ROOT}"
 
-# Keep the SQLite database in <repo>/data, never inside src.
-export Persistence__ConnectionString="${Persistence__ConnectionString:-Data Source=${REPO_ROOT}/data/swarm-cockpit.db}"
-mkdir -p "${REPO_ROOT}/data"
-
 dotnet restore
 
 # WSL2 only: refresh the Windows port-proxy so LAN clients can reach this
