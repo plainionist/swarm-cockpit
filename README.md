@@ -10,14 +10,13 @@ can watch and answer the swarm from any device on your network.
 
 ![Architecture](docs/architecture.png)
 
-**How it works:** SwarmForge runs the agents in tmux. The capture poller
-(`swarm-capture-screens.sh`) reads each pane with `tmux capture-pane` and pushes
-the rendered screen to the .NET cockpit service, which stores it in SQLite and
-renders the dashboard. Your browser polls the service for each agent's screen
-and activity status; anything you type is queued in the service and delivered
-back into the agent's pane with `tmux send-keys`. On WSL2, a Windows port-proxy
-exposes the service to the rest of your LAN. See
-[docs/architecture.drawio](docs/architecture.drawio) for the editable source.
+**How it works:** SwarmForge runs the agents in terminals. A capture poller
+reads each agent's screen and pushes it to the cockpit service, which stores the
+latest screens, tracks which agents are actively working, and serves the web
+dashboard. Your browser shows a live mirror of every agent; anything you type is
+queued in the service and delivered back into the right agent's terminal by the
+poller. See [docs/architecture.drawio](docs/architecture.drawio) for the
+editable source.
 
 ## Quick Start (WSL/bash)
 

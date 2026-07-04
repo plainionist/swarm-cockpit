@@ -1,79 +1,64 @@
 <mxfile host="app.diagrams.net" type="device">
   <diagram id="swarm-cockpit-arch" name="Architecture">
-    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1240" pageHeight="720" math="0" shadow="0">
+    <mxGraphModel dx="1200" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="560" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="title" value="swarm-cockpit — remote web control plane for a SwarmForge tmux swarm" style="text;html=1;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#13293D;" vertex="1" parent="1">
-          <mxGeometry x="40" y="20" width="1000" height="30" as="geometry" />
+        <mxCell id="title" value="swarm-cockpit — watch and drive a SwarmForge agent swarm from the browser" style="text;html=1;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#13293D;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="1000" height="30" as="geometry" />
         </mxCell>
 
-        <mxCell id="wsl" value="WSL2 (Ubuntu) — same host / same user as SwarmForge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF2FB;strokeColor=#2F80ED;verticalAlign=top;fontStyle=1;fontColor=#1B4F91;arcSize=4;" vertex="1" parent="1">
-          <mxGeometry x="40" y="70" width="780" height="560" as="geometry" />
+        <mxCell id="tmux" value="SwarmForge agents  (tmux terminals)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8AA9C9;verticalAlign=top;fontStyle=1;fontColor=#1B4F91;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="270" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="pane-a" value="Architect" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B1220;strokeColor=#1F2A3A;fontColor=#E6EDF3;fontFamily=monospace;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="65" y="165" width="220" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pane-i" value="Implementer" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B1220;strokeColor=#1F2A3A;fontColor=#E6EDF3;fontFamily=monospace;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="65" y="232" width="220" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="pane-v" value="Verifier" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B1220;strokeColor=#1F2A3A;fontColor=#E6EDF3;fontFamily=monospace;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="65" y="299" width="220" height="55" as="geometry" />
         </mxCell>
 
-        <mxCell id="tmux" value="SwarmForge  (tmux session over a private socket)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#8AA9C9;verticalAlign=top;fontStyle=1;fontColor=#1B4F91;arcSize=6;" vertex="1" parent="1">
-          <mxGeometry x="70" y="110" width="320" height="250" as="geometry" />
-        </mxCell>
-        <mxCell id="pane-a" value="pane: Architect&#10;(Copilot agent TUI)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B1220;strokeColor=#1F2A3A;fontColor=#E6EDF3;fontFamily=monospace;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="90" y="160" width="280" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="pane-i" value="pane: Implementer&#10;(Copilot agent TUI)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B1220;strokeColor=#1F2A3A;fontColor=#E6EDF3;fontFamily=monospace;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="90" y="224" width="280" height="52" as="geometry" />
-        </mxCell>
-        <mxCell id="pane-v" value="pane: Verifier&#10;(Copilot agent TUI)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0B1220;strokeColor=#1F2A3A;fontColor=#E6EDF3;fontFamily=monospace;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="90" y="288" width="280" height="52" as="geometry" />
+        <mxCell id="poller" value="Capture poller&#10;&#10;reads each terminal screen&#10;and types replies back in" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF6E7;strokeColor=#D9A400;align=center;verticalAlign=middle;fontColor=#7A5B00;" vertex="1" parent="1">
+          <mxGeometry x="380" y="185" width="200" height="140" as="geometry" />
         </mxCell>
 
-        <mxCell id="poller" value="Capture poller&#10;scripts/swarm-capture-screens.sh  (loop ~1s)&#10;&#10;• tmux capture-pane -p  →  rendered screen&#10;• tmux send-keys        ←  operator input&#10;&#10;started/stopped by enable-logs / disable-logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF6E7;strokeColor=#D9A400;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#7A5B00;" vertex="1" parent="1">
-          <mxGeometry x="70" y="430" width="320" height="150" as="geometry" />
+        <mxCell id="svc" value="Cockpit service&#10;&#10;stores the latest screens,&#10;tracks which agents are active,&#10;queues operator replies,&#10;serves the web dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7F6F1;strokeColor=#0F7B6C;align=center;verticalAlign=middle;fontColor=#0A5245;" vertex="1" parent="1">
+          <mxGeometry x="650" y="150" width="230" height="150" as="geometry" />
         </mxCell>
 
-        <mxCell id="svc" value="Cockpit Service   (.NET, listens on :5959)&#10;&#10;PUT  /api/agents/{a}/screen      ingest rendered screen&#10;GET  /api/agents/{a}/screen      latest screen&#10;GET  /api/agents/status          per-agent active/idle&#10;POST /api/agents/{a}/input       queue operator reply&#10;GET  /api/inputs/pending         poller drains queue&#10;POST /api/inputs/{id}/delivered  ack delivery&#10;GET  /                           renders HTML dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E7F6F1;strokeColor=#0F7B6C;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#0A5245;" vertex="1" parent="1">
-          <mxGeometry x="440" y="110" width="350" height="210" as="geometry" />
+        <mxCell id="db" value="Store  (database)&#10;&#10;screens · activity · reply queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F4F7;strokeColor=#526476;align=center;verticalAlign=middle;fontColor=#2A3A4A;" vertex="1" parent="1">
+          <mxGeometry x="650" y="360" width="230" height="90" as="geometry" />
         </mxCell>
 
-        <mxCell id="db" value="SQLite   data/swarm-cockpit.db&#10;&#10;agent_screens  content + changed_at&#10;                (changed_at drives active/idle)&#10;agent_inputs   pending → delivered queue&#10;agent_logs     line-log fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F1F4F7;strokeColor=#526476;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#2A3A4A;" vertex="1" parent="1">
-          <mxGeometry x="440" y="400" width="350" height="150" as="geometry" />
+        <mxCell id="browser" value="Operator browser&#10;&#10;live mirror of every agent,&#10;active / idle indicator,&#10;type a reply to any agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDEDED;strokeColor=#BF3B2A;align=center;verticalAlign=middle;fontColor=#8A2A1E;" vertex="1" parent="1">
+          <mxGeometry x="950" y="150" width="190" height="150" as="geometry" />
         </mxCell>
 
-        <mxCell id="win" value="Windows host  (LAN-facing)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3EEFB;strokeColor=#7A3FBF;verticalAlign=top;fontStyle=1;fontColor=#4B2483;arcSize=6;" vertex="1" parent="1">
-          <mxGeometry x="860" y="70" width="340" height="250" as="geometry" />
-        </mxCell>
-        <mxCell id="proxy" value="Port-proxy + firewall  (:5959)&#10;&#10;Scheduled task 'SwarmCockpitPortProxy'&#10;host:5959  →  current WSL IP:5959&#10;&#10;refreshes at logon (reboot-safe)&#10;and every 2 min (WSL IP changes)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7A3FBF;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#4B2483;" vertex="1" parent="1">
-          <mxGeometry x="885" y="115" width="290" height="180" as="geometry" />
-        </mxCell>
-
-        <mxCell id="browser" value="Operator browser   (any device on the LAN)&#10;http://&lt;windows-host&gt;:5959&#10;&#10;• polls /api/agents/status every 2s&#10;   → tab dot pulses blue when active,&#10;      hollow ring when idle&#10;• polls /screen → live terminal mirror&#10;• type a reply + Enter → POST /input" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDEDED;strokeColor=#BF3B2A;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fontColor=#8A2A1E;" vertex="1" parent="1">
-          <mxGeometry x="860" y="400" width="340" height="200" as="geometry" />
-        </mxCell>
-
-        <mxCell id="e-capture" value="capture-pane" style="endArrow=block;html=1;strokeColor=#D9A400;fontColor=#7A5B00;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.35;exitY=0;exitDx=0;exitDy=0;entryX=0.35;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="poller" target="tmux">
+        <mxCell id="e-capture" value="screen" style="endArrow=block;html=1;strokeColor=#D9A400;fontColor=#7A5B00;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" edge="1" parent="1" source="tmux" target="poller">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="e-sendkeys" value="send-keys" style="endArrow=block;html=1;strokeColor=#D9A400;fontColor=#7A5B00;fontSize=11;dashed=1;labelBackgroundColor=#FFFFFF;exitX=0.7;exitY=0;exitDx=0;exitDy=0;entryX=0.7;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="poller" target="tmux">
+        <mxCell id="e-sendkeys" value="reply" style="endArrow=block;html=1;strokeColor=#D9A400;fontColor=#7A5B00;fontSize=12;dashed=1;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.65;exitDx=0;exitDy=0;entryX=1;entryY=0.65;entryDx=0;entryDy=0;" edge="1" parent="1" source="poller" target="tmux">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
-        <mxCell id="e-put" value="PUT /screen&#10;GET /inputs/pending&#10;POST /inputs/{id}/delivered" style="endArrow=block;startArrow=block;html=1;strokeColor=#0F7B6C;fontColor=#0A5245;fontSize=11;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="poller" target="svc">
+        <mxCell id="e-svc" value="screens / replies" style="endArrow=block;startArrow=block;html=1;strokeColor=#0F7B6C;fontColor=#0A5245;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="poller" target="svc">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
-        <mxCell id="e-db" value="read / write" style="endArrow=block;startArrow=block;html=1;strokeColor=#526476;fontColor=#2A3A4A;fontSize=11;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="db">
+        <mxCell id="e-db" value="read / write" style="endArrow=block;startArrow=block;html=1;strokeColor=#526476;fontColor=#2A3A4A;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="svc" target="db">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
-        <mxCell id="e-proxy" value="forward :5959" style="endArrow=block;startArrow=block;html=1;strokeColor=#7A3FBF;fontColor=#4B2483;fontSize=11;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.1;entryDx=0;entryDy=0;" edge="1" parent="1" source="proxy" target="svc">
+        <mxCell id="e-http" value="view / reply" style="endArrow=block;startArrow=block;html=1;strokeColor=#BF3B2A;fontColor=#8A2A1E;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="svc">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
-        <mxCell id="e-http" value="HTTP  (poll status/screen, POST input)" style="endArrow=block;startArrow=block;html=1;strokeColor=#BF3B2A;fontColor=#8A2A1E;fontSize=11;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="browser" target="proxy">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-
-        <mxCell id="legend" value="Data flow:  agent terminal → capture-pane → PUT /screen → SQLite → browser mirror&#10;Input flow:  browser → POST /input → SQLite queue → poller GET /inputs/pending → send-keys → agent terminal" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontColor=#526476;spacingLeft=4;" vertex="1" parent="1">
-          <mxGeometry x="40" y="650" width="1160" height="50" as="geometry" />
+        <mxCell id="legend" value="Screen flow:  agent terminal → poller → service → browser mirror&#10;Reply flow:  browser → service → poller → agent terminal" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#526476;spacingLeft=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="475" width="1100" height="50" as="geometry" />
         </mxCell>
 
       </root>
