@@ -28,8 +28,9 @@ internal static class HtmlRenderer
         html.AppendLine("    .tabs { display:flex; gap:8px; border-bottom:1px solid var(--line); padding-bottom:8px; overflow:auto; }");
         html.AppendLine("    .tab { border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:8px; padding:8px 10px; cursor:pointer; white-space:nowrap; }");
         html.AppendLine("    .tab.active { border-color:#0f7b6c; box-shadow:0 0 0 2px rgba(15,123,108,.15) inset; font-weight:700; }");
-        html.AppendLine("    .tab-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; background:#9ca8b3; vertical-align:middle; }");
-        html.AppendLine("    .tab-dot.running { background:#0f7b6c; }");
+        html.AppendLine("    .tab-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; background:transparent; border:1.5px solid #2f80ed; box-sizing:border-box; vertical-align:middle; }");
+        html.AppendLine("    .tab-dot.running { background:#2f80ed; border-color:#2f80ed; animation:dotPulse 1.2s ease-in-out infinite; }");
+        html.AppendLine("    @keyframes dotPulse { 0%,100% { box-shadow:0 0 0 0 rgba(47,128,237,.55); } 50% { box-shadow:0 0 0 5px rgba(47,128,237,0); } }");
         html.AppendLine("    .tab-panel { display:none; margin-top:12px; }");
         html.AppendLine("    .tab-panel.active { display:block; }");
         html.AppendLine("    .meta { color:var(--muted); font-size:.9rem; }");
