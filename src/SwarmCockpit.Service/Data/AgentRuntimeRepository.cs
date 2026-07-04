@@ -209,6 +209,107 @@ public sealed class AgentRuntimeRepository
         }
     }
 
+    public async Task<AgentInputViewModel> EnqueueInputAsync(
+        string agentName,
+        string text,
+        bool submit,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var createdAt = DateTimeOffset.UtcNow;
+            var trimmedName = agentName.Trim();
+            // Answers are single-line; strip embedded newlines so send-keys stays predictable.
+            var sanitized = text.Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                INSERT INTO agent_inputs (agent_name, text, submit, created_at)
+                VALUES ($agentName, $text, $submit, $createdAt)
+                RETURNING id;
+                """;
+            command.Parameters.AddWithValue("$agentName", trimmedName);
+            command.Parameters.AddWithValue("$text", sanitized);
+            command.Parameters.AddWithValue("$submit", submit ? 1 : 0);
+            command.Parameters.AddWithValue("$createdAt", createdAt.ToString("O"));
+
+            var id = (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+            return new AgentInputViewModel(id, trimmedName, sanitized, submit, createdAt);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<AgentInputViewModel>> GetPendingInputsAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT id, agent_name, text, submit, created_at
+                FROM agent_inputs
+                WHERE delivered_at IS NULL
+                ORDER BY id ASC;
+                """;
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<AgentInputViewModel>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add(new AgentInputViewModel(
+                    reader.GetInt64(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetInt32(3) != 0,
+                    DateTimeOffset.Parse(reader.GetString(4))));
+            }
+
+            return rows;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<bool> MarkInputDeliveredAsync(long id, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                UPDATE agent_inputs
+                SET delivered_at = $deliveredAt
+                WHERE id = $id AND delivered_at IS NULL;
+                """;
+            command.Parameters.AddWithValue("$deliveredAt", DateTimeOffset.UtcNow.ToString("O"));
+            command.Parameters.AddWithValue("$id", id);
+
+            return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<AgentActivitySnapshot>> GetLatestAgentActivityAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -319,6 +420,18 @@ public sealed class AgentRuntimeRepository
                 content TEXT NOT NULL,
                 captured_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS agent_inputs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_name TEXT NOT NULL,
+                text TEXT NOT NULL,
+                submit INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                delivered_at TEXT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_agent_inputs_pending
+            ON agent_inputs(delivered_at, id);
             """;
         command.ExecuteNonQuery();
     }

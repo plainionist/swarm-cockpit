@@ -90,6 +90,49 @@ app.MapGet("/api/agents/{agentName}/screen", async Task<Results<Ok<AgentScreenVi
 	return TypedResults.Ok(screen);
 });
 
+app.MapPost("/api/agents/{agentName}/input", async Task<Results<Ok<AgentInputViewModel>, BadRequest<string>>>
+	(string agentName, SendAgentInputRequest request, AgentRuntimeRepository repository, CancellationToken cancellationToken) =>
+{
+	if (string.IsNullOrWhiteSpace(agentName))
+	{
+		return TypedResults.BadRequest("agentName is required.");
+	}
+
+	if (request.Text is null)
+	{
+		return TypedResults.BadRequest("Text is required.");
+	}
+
+	var queued = await repository.EnqueueInputAsync(agentName, request.Text, request.Submit, cancellationToken);
+	return TypedResults.Ok(queued);
+});
+
+// Poller-facing endpoint. Returns one line per pending input as:
+//   <id> <submit 0|1> <base64(agentName)> <base64(text)>
+// base64 keeps parsing dependency-free in bash (base64 -d only).
+app.MapGet("/api/inputs/pending", async (AgentRuntimeRepository repository, CancellationToken cancellationToken) =>
+{
+	var pending = await repository.GetPendingInputsAsync(cancellationToken);
+	var sb = new System.Text.StringBuilder();
+	foreach (var input in pending)
+	{
+		var agentB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(input.AgentName));
+		var textB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(input.Text));
+		sb.Append(input.Id).Append(' ')
+			.Append(input.Submit ? '1' : '0').Append(' ')
+			.Append(agentB64).Append(' ')
+			.Append(textB64).Append('\n');
+	}
+
+	return Results.Text(sb.ToString(), "text/plain");
+});
+
+app.MapPost("/api/inputs/{id:long}/delivered", async (long id, AgentRuntimeRepository repository, CancellationToken cancellationToken) =>
+{
+	var ok = await repository.MarkInputDeliveredAsync(id, cancellationToken);
+	return Results.Ok(new { delivered = ok });
+});
+
 app.MapDelete("/api/agents/{agentName}/logs", async (string agentName, AgentRuntimeRepository repository, CancellationToken cancellationToken) =>
 {
 	var deleted = await repository.ClearLogsAsync(agentName, cancellationToken);

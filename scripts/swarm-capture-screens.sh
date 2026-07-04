@@ -63,6 +63,44 @@ if ! tmux -S "${socket}" capture-pane -p -J -t "${first_target}" >/dev/null 2>&1
 fi
 log "using capture flags: ${capture_flags[*]}"
 
+# Build agent -> target lookup for input delivery.
+declare -A target_by_agent=()
+for entry in "${panes[@]}"; do
+  target_by_agent["${entry%%=*}"]="${entry#*=}"
+done
+
+# Deliver any operator input queued in the cockpit to the matching tmux pane.
+# The endpoint returns lines: "<id> <submit 0|1> <base64 agent> <base64 text>".
+drain_inputs() {
+  local pending
+  if ! pending="$(curl -fsS "${base_url}/api/inputs/pending" 2>/dev/null)"; then
+    return
+  fi
+  [[ -z "${pending}" ]] && return
+
+  local in_id in_submit in_agent_b64 in_text_b64 in_agent in_text in_target
+  while read -r in_id in_submit in_agent_b64 in_text_b64; do
+    [[ -z "${in_id}" ]] && continue
+    in_agent="$(printf '%s' "${in_agent_b64}" | base64 -d 2>/dev/null)"
+    in_text="$(printf '%s' "${in_text_b64}" | base64 -d 2>/dev/null)"
+    in_target="${target_by_agent[${in_agent}]:-}"
+
+    if [[ -z "${in_target}" ]]; then
+      # Not one of our panes; leave it for another poller instance.
+      continue
+    fi
+
+    # -l sends the text literally so key names (Enter, C-c, ...) are not interpreted.
+    tmux -S "${socket}" send-keys -t "${in_target}" -l -- "${in_text}" 2>/dev/null || true
+    if [[ "${in_submit}" == "1" ]]; then
+      tmux -S "${socket}" send-keys -t "${in_target}" Enter 2>/dev/null || true
+    fi
+    log "delivered input #${in_id} to ${in_agent} (${in_target})"
+
+    curl -fsS -X POST "${base_url}/api/inputs/${in_id}/delivered" >/dev/null 2>&1 || true
+  done <<< "${pending}"
+}
+
 first_pass=1
 
 while true; do
@@ -92,6 +130,8 @@ while true; do
       log "PUT screen FAILED for ${agent} -> ${base_url}"
     fi
   done
+
+  drain_inputs
 
   first_pass=0
   sleep "${interval}"

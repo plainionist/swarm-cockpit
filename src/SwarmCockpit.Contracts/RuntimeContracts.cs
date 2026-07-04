@@ -11,6 +11,15 @@ public sealed record AgentLogLineViewModel(
 
 public sealed record IngestAgentScreenRequest(string Content);
 
+public sealed record SendAgentInputRequest(string Text, bool Submit = true);
+
+public sealed record AgentInputViewModel(
+    long Id,
+    string AgentName,
+    string Text,
+    bool Submit,
+    DateTimeOffset CreatedAt);
+
 public sealed record AgentScreenViewModel(
     string AgentName,
     string Content,

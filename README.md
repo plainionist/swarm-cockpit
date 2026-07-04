@@ -30,6 +30,14 @@ bash ./swarm-cockpit enable-logs
 This polls `tmux capture-pane` and shows the agent's actual rendered screen in the
 web page (what you'd see in the terminal), instead of raw redraw bytes.
 
+### Reply to an agent from the browser
+
+Each agent panel has an input box. Type a reply and press Enter (or click Send) and
+the text is delivered straight into that agent's tmux pane via `tmux send-keys` — so
+you can answer the questions you see on the mirrored screen from any device on the
+network, no agent cooperation required. Input is queued in the cockpit and delivered
+by the same poller that mirrors the screen (within ~1s).
+
 Ask a blocking question from an agent shell:
 
 ```bash
