@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  swarm-cockpit start [-- <extra dotnet args>]
+  swarm-cockpit enable-logs [--base-url <url>] [--config <path>] [--socket-file <path>]
+  swarm-cockpit disable-logs [--config <path>] [--socket-file <path>]
+  swarm-cockpit ask --agent <name> --context <text> --question <text> --recommendation <text> [--option <text> ...] [--base-url <url>] [--poll-interval-ms <ms>]
+EOF
+}
+
+if [[ $# -lt 1 ]]; then
+  usage
+  exit 1
+fi
+
+verb="$1"
+shift
+
+case "${verb}" in
+  start)
+    bash "${SCRIPT_DIR}/scripts/start-service.sh" "$@"
+    ;;
+  enable-logs)
+    bash "${SCRIPT_DIR}/scripts/swarmforge-enable-log-stream.sh" "$@"
+    ;;
+  disable-logs)
+    bash "${SCRIPT_DIR}/scripts/swarmforge-disable-log-stream.sh" "$@"
+    ;;
+  ask)
+    bash "${SCRIPT_DIR}/scripts/swarm-ask.sh" "$@"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    echo "Unknown verb: ${verb}" >&2
+    usage
+    exit 1
+    ;;
+esac

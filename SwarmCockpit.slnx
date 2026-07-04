@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SwarmCockpit.Cli/SwarmCockpit.Cli.csproj" />
+    <Project Path="src/SwarmCockpit.Contracts/SwarmCockpit.Contracts.csproj" />
+    <Project Path="src/SwarmCockpit.Service/SwarmCockpit.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SwarmCockpit.AcceptanceTests/SwarmCockpit.AcceptanceTests.csproj" />
+  </Folder>
+</Solution>

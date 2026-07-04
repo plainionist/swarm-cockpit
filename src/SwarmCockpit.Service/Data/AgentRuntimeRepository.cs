@@ -1,0 +1,247 @@
+using Microsoft.Data.Sqlite;
+using SwarmCockpit.Contracts;
+
+namespace SwarmCockpit.Service;
+
+public sealed class AgentRuntimeRepository
+{
+    private readonly string _connectionString;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    public AgentRuntimeRepository(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetValue<string>("Persistence:ConnectionString")
+            ?? "Data Source=./data/swarm-cockpit.db";
+
+        InitializeDatabase();
+    }
+
+    public async Task<AgentLogLineViewModel> AppendLogAsync(
+        string agentName,
+        string message,
+        string stream,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var createdAt = DateTimeOffset.UtcNow;
+
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                INSERT INTO agent_logs (agent_name, message, stream, created_at)
+                VALUES ($agentName, $message, $stream, $createdAt)
+                RETURNING id;
+                """;
+            command.Parameters.AddWithValue("$agentName", agentName.Trim());
+            command.Parameters.AddWithValue("$message", message);
+            command.Parameters.AddWithValue("$stream", string.IsNullOrWhiteSpace(stream) ? "stdout" : stream.Trim());
+            command.Parameters.AddWithValue("$createdAt", createdAt.ToString("O"));
+
+            var id = (long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+
+            return new AgentLogLineViewModel(
+                id,
+                agentName.Trim(),
+                message,
+                string.IsNullOrWhiteSpace(stream) ? "stdout" : stream.Trim(),
+                createdAt);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<AgentLogLineViewModel>> GetRecentLogsAsync(string agentName, int take, CancellationToken cancellationToken)
+    {
+        var normalizedTake = Math.Clamp(take, 1, 500);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT id, agent_name, message, stream, created_at
+                FROM agent_logs
+                WHERE agent_name = $agentName COLLATE NOCASE
+                ORDER BY id DESC
+                LIMIT $take;
+                """;
+            command.Parameters.AddWithValue("$agentName", agentName);
+            command.Parameters.AddWithValue("$take", normalizedTake);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<AgentLogLineViewModel>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add(MapRow(reader));
+            }
+
+            rows.Reverse();
+            return rows;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<AgentLogLineViewModel>> GetLogsAfterAsync(
+        string agentName,
+        long afterId,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var normalizedTake = Math.Clamp(take, 1, 500);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT id, agent_name, message, stream, created_at
+                FROM agent_logs
+                WHERE agent_name = $agentName COLLATE NOCASE AND id > $afterId
+                ORDER BY id ASC
+                LIMIT $take;
+                """;
+            command.Parameters.AddWithValue("$agentName", agentName);
+            command.Parameters.AddWithValue("$afterId", afterId);
+            command.Parameters.AddWithValue("$take", normalizedTake);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<AgentLogLineViewModel>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add(MapRow(reader));
+            }
+
+            return rows;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<AgentActivitySnapshot>> GetLatestAgentActivityAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT l.agent_name, l.message, l.created_at
+                FROM agent_logs l
+                INNER JOIN (
+                    SELECT agent_name, MAX(id) AS max_id
+                    FROM agent_logs
+                    GROUP BY agent_name
+                ) m ON l.id = m.max_id
+                ORDER BY l.agent_name;
+                """;
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var rows = new List<AgentActivitySnapshot>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add(new AgentActivitySnapshot(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    DateTimeOffset.Parse(reader.GetString(2))));
+            }
+
+            return rows;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<int> ClearLogsAsync(string agentName, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                DELETE FROM agent_logs
+                WHERE agent_name = $agentName COLLATE NOCASE;
+                """;
+            command.Parameters.AddWithValue("$agentName", agentName);
+
+            return await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private void InitializeDatabase()
+    {
+        var builder = new SqliteConnectionStringBuilder(_connectionString);
+        if (!string.IsNullOrWhiteSpace(builder.DataSource))
+        {
+            var dbFilePath = Path.GetFullPath(builder.DataSource);
+            var folder = Path.GetDirectoryName(dbFilePath);
+            if (!string.IsNullOrWhiteSpace(folder))
+            {
+                Directory.CreateDirectory(folder);
+            }
+        }
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS agent_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_name TEXT NOT NULL,
+                message TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_agent_logs_agent_id
+            ON agent_logs(agent_name, id);
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private static AgentLogLineViewModel MapRow(SqliteDataReader reader)
+    {
+        return new AgentLogLineViewModel(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            DateTimeOffset.Parse(reader.GetString(4)));
+    }
+}
+
+public sealed record AgentActivitySnapshot(string AgentName, string LastMessage, DateTimeOffset LastActivity);
