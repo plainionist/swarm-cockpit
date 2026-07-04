@@ -2,6 +2,23 @@
 
 Sidecar web cockpit for SwarmForge.
 
+swarm-cockpit gives you a browser view of a running SwarmForge agent swarm and
+lets you drive it remotely. A small poller mirrors each agent's live tmux
+terminal into a web dashboard, flags which agents are actively working, and
+sends your typed replies straight back into the right agent's terminal — so you
+can watch and answer the swarm from any device on your network.
+
+![Architecture](docs/architecture.png)
+
+**How it works:** SwarmForge runs the agents in tmux. The capture poller
+(`swarm-capture-screens.sh`) reads each pane with `tmux capture-pane` and pushes
+the rendered screen to the .NET cockpit service, which stores it in SQLite and
+renders the dashboard. Your browser polls the service for each agent's screen
+and activity status; anything you type is queued in the service and delivered
+back into the agent's pane with `tmux send-keys`. On WSL2, a Windows port-proxy
+exposes the service to the rest of your LAN. See
+[docs/architecture.drawio](docs/architecture.drawio) for the editable source.
+
 ## Quick Start (WSL/bash)
 
 ```bash
