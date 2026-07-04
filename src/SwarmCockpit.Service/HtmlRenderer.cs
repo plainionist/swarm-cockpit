@@ -32,16 +32,11 @@ internal static class HtmlRenderer
         html.AppendLine("    .tab-dot.running { background:#0f7b6c; }");
         html.AppendLine("    .tab-panel { display:none; margin-top:12px; }");
         html.AppendLine("    .tab-panel.active { display:block; }");
-        html.AppendLine("    .tab-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }");
-        html.AppendLine("    .tab-actions { display:flex; gap:8px; align-items:center; }");
-        html.AppendLine("    .tab-title { font-size:1.1rem; font-weight:700; }");
-        html.AppendLine("    .tab-state { color:var(--muted); font-size:.9rem; }");
         html.AppendLine("    .meta { color:var(--muted); font-size:.9rem; }");
         html.AppendLine("    ul { margin:8px 0 8px 22px; }");
         html.AppendLine("    pre.log-full { white-space:pre; overflow:auto; background:#0b1220; color:#e6edf3; border:1px solid #1f2a3a; border-radius:8px; padding:12px; margin:0; width:100%; box-sizing:border-box; max-height:calc(100vh - 150px); font-family:'Cascadia Mono','Consolas','SFMono-Regular',ui-monospace,Menlo,monospace; font-size:12.5px; line-height:1.3; tab-size:4; }");
         html.AppendLine("    textarea { width:100%; min-height:70px; border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }");
         html.AppendLine("    button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:8px 12px; cursor:pointer; }");
-        html.AppendLine("    .btn-clear { background:#fff; color:var(--ink); border:1px solid var(--line); }");
         html.AppendLine("    .input-bar { display:flex; gap:8px; margin-top:10px; }");
         html.AppendLine("    .input-box { flex:1; border:1px solid var(--line); border-radius:8px; padding:9px 10px; font:inherit; font-family:'Cascadia Mono','Consolas',ui-monospace,monospace; }");
         html.AppendLine("    .input-box:disabled { background:#f1f4f7; color:var(--muted); }");
@@ -86,13 +81,6 @@ internal static class HtmlRenderer
 
             var panelActive = i == 0 ? " active" : string.Empty;
             html.AppendLine($"      <article class=\"tab-panel{panelActive}\" data-agent=\"{Html(status.AgentName)}\">");
-            html.AppendLine("        <div class=\"tab-header\">");
-            html.AppendLine($"          <div class=\"tab-title\">{Html(status.AgentName)}</div>");
-            html.AppendLine("          <div class=\"tab-actions\">");
-            html.AppendLine("            <div class=\"tab-state\" data-role=\"state\"></div>");
-            html.AppendLine("            <button type=\"button\" class=\"btn-clear\" data-role=\"clear\">Clear logs</button>");
-            html.AppendLine("          </div>");
-            html.AppendLine("        </div>");
             html.AppendLine($"        <pre class=\"log-full\" data-role=\"log\">{Html(logText)}</pre>");
             html.AppendLine("        <form class=\"input-bar\" data-role=\"input-form\">");
             html.AppendLine($"          <input type=\"text\" class=\"input-box\" data-role=\"input\" placeholder=\"Type a reply and press Enter to send to {Html(status.AgentName)}'s terminal\" autocomplete=\"off\" />");
@@ -178,15 +166,8 @@ internal static class HtmlRenderer
         html.AppendLine("        logNode.textContent = text || 'No output yet.';");
         html.AppendLine("        if (nearBottom) { logNode.scrollTop = logNode.scrollHeight; }");
         html.AppendLine("      }");
-        html.AppendLine("      async function clearActiveLog() {");
-        html.AppendLine("        if (!activeAgent) return;");
-        html.AppendLine("        await fetch('/api/agents/' + encodeURIComponent(activeAgent) + '/logs', { method: 'DELETE' });");
-        html.AppendLine("        await refreshActiveLog();");
-        html.AppendLine("      }");
         html.AppendLine("      tabs.forEach(tab => tab.addEventListener('click', () => { setActive(tab.dataset.agent); refreshActiveLog().catch(() => {}); }));");
         html.AppendLine("      panels.forEach(panel => {");
-        html.AppendLine("        const clearBtn = panel.querySelector(\"[data-role='clear']\");");
-        html.AppendLine("        if (clearBtn) { clearBtn.addEventListener('click', () => clearActiveLog().catch(() => {})); }");
         html.AppendLine("        const form = panel.querySelector(\"[data-role='input-form']\");");
         html.AppendLine("        const box = panel.querySelector(\"[data-role='input']\");");
         html.AppendLine("        if (form && box) {");
