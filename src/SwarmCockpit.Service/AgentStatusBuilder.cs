@@ -23,7 +23,7 @@ internal static class AgentStatusBuilder
             configuredAgents = ["Architect", "Implementer", "Verifier"];
         }
 
-        var runningThresholdSeconds = configuration.GetValue<int?>("Swarm:RunningThresholdSeconds") ?? 45;
+        var runningThresholdSeconds = configuration.GetValue<int?>("Swarm:RunningThresholdSeconds") ?? 5;
         var snapshots = await runtimeRepository.GetLatestAgentActivityAsync(cancellationToken);
         var snapshotByAgent = snapshots.ToDictionary(s => s.AgentName, StringComparer.OrdinalIgnoreCase);
 

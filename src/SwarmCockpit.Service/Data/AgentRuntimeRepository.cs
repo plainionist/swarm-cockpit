@@ -151,18 +151,43 @@ public sealed class AgentRuntimeRepository
             await using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync(cancellationToken);
 
+            // Determine whether the rendered screen actually changed. changed_at
+            // only advances on real content changes, so it reflects terminal
+            // activity rather than the fixed capture cadence.
+            var existing = connection.CreateCommand();
+            existing.CommandText = "SELECT content, changed_at FROM agent_screens WHERE agent_name = $agentName;";
+            existing.Parameters.AddWithValue("$agentName", trimmedName);
+
+            string? previousContent = null;
+            string? previousChangedAt = null;
+            await using (var reader = await existing.ExecuteReaderAsync(cancellationToken))
+            {
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    previousContent = reader.GetString(0);
+                    previousChangedAt = reader.GetString(1);
+                }
+            }
+
+            var contentChanged = !string.Equals(previousContent, content, StringComparison.Ordinal);
+            var changedAt = contentChanged || previousChangedAt is null
+                ? capturedAt.ToString("O")
+                : previousChangedAt;
+
             var command = connection.CreateCommand();
             command.CommandText =
                 """
-                INSERT INTO agent_screens (agent_name, content, captured_at)
-                VALUES ($agentName, $content, $capturedAt)
+                INSERT INTO agent_screens (agent_name, content, captured_at, changed_at)
+                VALUES ($agentName, $content, $capturedAt, $changedAt)
                 ON CONFLICT(agent_name) DO UPDATE SET
                     content = excluded.content,
-                    captured_at = excluded.captured_at;
+                    captured_at = excluded.captured_at,
+                    changed_at = excluded.changed_at;
                 """;
             command.Parameters.AddWithValue("$agentName", trimmedName);
             command.Parameters.AddWithValue("$content", content);
             command.Parameters.AddWithValue("$capturedAt", capturedAt.ToString("O"));
+            command.Parameters.AddWithValue("$changedAt", changedAt);
 
             await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -331,7 +356,7 @@ public sealed class AgentRuntimeRepository
                         GROUP BY agent_name
                     ) m ON l.id = m.max_id
                     UNION ALL
-                    SELECT agent_name AS agent_name, '' AS message, captured_at AS created_at
+                    SELECT agent_name AS agent_name, '' AS message, changed_at AS created_at
                     FROM agent_screens
                 )
                 ORDER BY agent_name;
@@ -418,7 +443,8 @@ public sealed class AgentRuntimeRepository
             CREATE TABLE IF NOT EXISTS agent_screens (
                 agent_name TEXT PRIMARY KEY,
                 content TEXT NOT NULL,
-                captured_at TEXT NOT NULL
+                captured_at TEXT NOT NULL,
+                changed_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS agent_inputs (
@@ -434,6 +460,24 @@ public sealed class AgentRuntimeRepository
             ON agent_inputs(delivered_at, id);
             """;
         command.ExecuteNonQuery();
+
+        // Migration: older databases have agent_screens without changed_at.
+        var migrate = connection.CreateCommand();
+        migrate.CommandText =
+            """
+            SELECT COUNT(*) FROM pragma_table_info('agent_screens') WHERE name = 'changed_at';
+            """;
+        var hasChangedAt = Convert.ToInt64(migrate.ExecuteScalar()) > 0;
+        if (!hasChangedAt)
+        {
+            var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE agent_screens ADD COLUMN changed_at TEXT NOT NULL DEFAULT '';";
+            alter.ExecuteNonQuery();
+
+            var backfill = connection.CreateCommand();
+            backfill.CommandText = "UPDATE agent_screens SET changed_at = captured_at WHERE changed_at = '';";
+            backfill.ExecuteNonQuery();
+        }
     }
 
     private static AgentLogLineViewModel MapRow(SqliteDataReader reader)
