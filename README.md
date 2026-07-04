@@ -44,8 +44,44 @@ Disable screen mirroring:
 bash ./swarm-cockpit disable-logs
 ```
 
+## Access from another machine (WSL2)
+
+If SwarmForge and the cockpit run inside **WSL2**, binding port 5959 there is not
+enough: WSL2 sits behind a NAT, so other machines on your LAN cannot reach it, and
+the WSL IP changes on every WSL restart. (Windows 11 "mirrored" networking would
+avoid this, but it silently falls back to NAT on many corporate machines.)
+
+The fix is a Windows port-proxy that forwards `host:5959 -> currentWslIp:5959`,
+kept up to date automatically. Run this **once** from an elevated (Administrator)
+PowerShell on the Windows host:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\install-cockpit-portproxy.ps1
+```
+
+This:
+
+- adds the inbound firewall rule for TCP 5959,
+- forwards the host's LAN interface to the current WSL IP, and
+- registers a scheduled task (`SwarmCockpitPortProxy`) that re-points the proxy at
+  logon (survives reboots) and every 2 minutes (catches WSL IP changes).
+
+`bash ./swarm-cockpit start` also triggers that task on startup, so the proxy is
+refreshed the moment the service comes up. From another machine, browse to
+`http://<windows-host-LAN-ip>:5959`.
+
+Manual one-off refresh (no scheduled task needed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\update-cockpit-portproxy.ps1
+```
+
+To remove the automation: `Unregister-ScheduledTask -TaskName SwarmCockpitPortProxy -Confirm:$false`
+
 ## Notes
 
 - Keep SwarmForge launch/config unchanged.
 - No Copilot plugin/hook required.
 - Allow inbound TCP 5959 on the host firewall if remote machines cannot connect.
+- Running natively on Linux (not WSL2)? None of the port-proxy setup is needed —
+  just open TCP 5959 on the host firewall.
